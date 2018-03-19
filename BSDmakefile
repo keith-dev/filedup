@@ -1,7 +1,8 @@
 PROG_CXX = filedup
 SRCS     = main.cc
+MK_MAN   = no
 
-CXXFLAGS = -std=c++11 -Wall -Wextra
+CXXFLAGS = -g -std=c++11 -Wall -Wextra
 LDFLAGS  = -lcrypto
 
 .include <bsd.prog.mk>
