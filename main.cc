@@ -97,17 +97,18 @@ void show_duplicates(const files_t& files)
 
 void scan_dir(files_t& files, std::string dirname, int64_t threshold)
 {
-	if (dirname.back() == '/') dirname.resize(dirname.size() - 1);
-	if (dirname.empty()) dirname = ".";
-
 	if (DIR* d = opendir(dirname.c_str())) {
 		while (struct dirent* entry = readdir(d)) {
 			if ((entry->d_name[0] == '.' && entry->d_name[1] == '\0') || (entry->d_name[0] == '.' && entry->d_name[1] == '.' && entry->d_name[2] == '\0'))
 				continue;
 
-			const std::string name = dirname + std::string("/") + entry->d_name;
+			const std::string name = dirname + (dirname.back() != '/' ? std::string("/") : std::string()) + entry->d_name;
+
 			struct stat info;
 			if (stat(name.c_str(), &info) != -1) {
+				if (S_ISLNK(info.st_mode)) {
+					continue;
+				}
 				if (S_ISDIR(info.st_mode)) {
 					scan_dir(files, name, threshold);
 				}
@@ -122,16 +123,20 @@ void scan_dir(files_t& files, std::string dirname, int64_t threshold)
 }
 
 void scan_file(files_t& files, std::string filename, int64_t size, int64_t threshold)
+try
 {
 	if (size < threshold) return;
+	std::unique_ptr<char[]> buf(new char[size]);
 
 	std::ifstream is(filename, std::ios::binary);
-	std::unique_ptr<char[]> buf(new char[size]);
 	is.read(buf.get(), size);
 
 	md5_t stamp;
 	MD5((unsigned char*)buf.get(), size, stamp.value);
 	files.emplace(std::make_pair(stamp, std::move(filename)));
+}
+catch (const std::bad_alloc &)
+{
 }
 
 //---------------------------------------------------------------------------
