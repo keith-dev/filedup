@@ -31,34 +31,50 @@ inline bool operator< (const md5_t& a, const md5_t& b) { return memcmp(a.value, 
 inline bool operator==(const md5_t& a, const md5_t& b) { return memcmp(a.value, b.value, MD5_DIGEST_LENGTH) == 0; }
 std::ostream& md5(std::ostream& os, const md5_t& n);
 
-typedef std::multimap<md5_t, std::string> files_t;
-void scan_dir (files_t& files, std::string dir,  int64_t threshold);
-void scan_file(files_t& files, std::string file, int64_t size, int64_t threshold);
+typedef std::tuple<ino_t, off_t, std::string> file_info_t;
+inline ino_t&       file_inode(file_info_t& info)      { return std::get<0>(info); }
+inline off_t&       file_size(file_info_t& info)       { return std::get<1>(info); }
+inline std::string& file_name(file_info_t& info)       { return std::get<2>(info); }
+inline ino_t        file_inode(const file_info_t& info){ return std::get<0>(info); }
+inline off_t        file_size(const file_info_t& info) { return std::get<1>(info); }
+inline std::string  file_name(const file_info_t& info) { return std::get<2>(info); }
+
+typedef std::multimap<md5_t, file_info_t> files_t;
+void scan_dir (files_t& files, std::string dir, int64_t threshold);
+void scan_file(files_t& files, file_info_t& file, int64_t threshold);
 void show_duplicates(const files_t& files);
 
 //---------------------------------------------------------------------------
 
 int main(int argc, char* argv[])
+try
 {
 	int threshold = 0;
 	bool want_threshold = false;
 
 	files_t files;
 	std::for_each(argv + 1, argv + argc, [&](const char* arg) {
-		if (want_threshold) {
+		if (strcmp(arg, "-s") == 0 || strcmp(arg, "--size") == 0) {
+			want_threshold = true;
+			return;
+		}
+		else if (want_threshold) {
 			threshold = atoi(arg);
 			want_threshold = false;
 			return;
 		}
-		if (strcmp(arg, "-s") == 0 || strcmp(arg, "--size") == 0) {
-			want_threshold = true;
-			return;
+		else if (arg[0] == '-') {
+			throw std::runtime_error(std::string("bad arg: ") + arg);
 		}
 
 		scan_dir(files, arg, threshold);
 	});
 	std::cout << "nfiles=" << files.size() << std::endl;
 	show_duplicates(files);
+}
+catch (const std::exception &e)
+{
+	std::clog << e.what() << "\n";
 }
 
 //---------------------------------------------------------------------------
@@ -68,28 +84,28 @@ void show_duplicates(const files_t& files)
 	if (files.empty()) return;
 
 	auto p = files.begin();
-	auto key = p->first;
-	auto val = p->second;
+	auto* key = &p->first;
+	auto* val = &p->second;
 
 	for (;;) {
 		if ((++p) == files.end()) return;
 
-		if (p->first == key) {
-			std::cout << std::endl;
-			std::cout << val << std::endl;
+		if (p->first == *key) {
+			std::cout << "\n";
+			std::cout << file_name(*val) << "\n";
 
 			do {
-				key = p->first;
-				val = p->second;
-				std::cout << val << std::endl;
+				key = &p->first;
+				val = &p->second;
+				std::cout << file_name(*val) << "\n";
 
 				if ((++p) == files.end()) return;
 			}
-			while (p->first == key);
+			while (p->first == *key);
 		}
 
-		key = p->first;
-		val = p->second;
+		key = &p->first;
+		val = &p->second;
 	}
 }
 
@@ -102,7 +118,7 @@ void scan_dir(files_t& files, std::string dirname, int64_t threshold)
 			if ((entry->d_name[0] == '.' && entry->d_name[1] == '\0') || (entry->d_name[0] == '.' && entry->d_name[1] == '.' && entry->d_name[2] == '\0'))
 				continue;
 
-			const std::string name = dirname + (dirname.back() != '/' ? std::string("/") : std::string()) + entry->d_name;
+			std::string name = dirname + (dirname.back() != '/' ? std::string("/") : std::string()) + entry->d_name;
 
 			struct stat info;
 			if (stat(name.c_str(), &info) != -1) {
@@ -113,7 +129,8 @@ void scan_dir(files_t& files, std::string dirname, int64_t threshold)
 					scan_dir(files, name, threshold);
 				}
 				if (S_ISREG(info.st_mode)) {
-					scan_file(files, name, info.st_size, threshold);
+					file_info_t rec = std::make_tuple(info.st_ino, info.st_size, std::move(name));
+					scan_file(files, rec, threshold);
 				}
 			}
 		}
@@ -122,21 +139,28 @@ void scan_dir(files_t& files, std::string dirname, int64_t threshold)
 	}
 }
 
-void scan_file(files_t& files, std::string filename, int64_t size, int64_t threshold)
+void scan_file(files_t& files, file_info_t& info, int64_t threshold)
 try
 {
-	if (size < threshold) return;
-	std::unique_ptr<char[]> buf(new char[size]);
+	if (file_size(info) < threshold) return;
+	std::unique_ptr<char[]> buf(new char[file_size(info)]);
 
-	std::ifstream is(filename, std::ios::binary);
-	is.read(buf.get(), size);
+	std::ifstream is(file_name(info), std::ios::binary);
+	if (!is)
+		throw std::runtime_error("cannot open: " + file_name(info));
+	is.read(buf.get(), file_size(info));
 
 	md5_t stamp;
-	MD5((unsigned char*)buf.get(), size, stamp.value);
-	files.emplace(std::make_pair(stamp, std::move(filename)));
+	MD5((unsigned char*)buf.get(), file_size(info), stamp.value);
+	files.emplace(std::make_pair(stamp, std::move(info)));
 }
 catch (const std::bad_alloc &)
 {
+	std::clog << "file too large: " << file_name(info) << "\n";
+}
+catch (const std::exception &e)
+{
+//	std::clog << e.what() << "\n";
 }
 
 //---------------------------------------------------------------------------
