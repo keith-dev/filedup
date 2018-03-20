@@ -70,37 +70,53 @@ std::ostream& md5(std::ostream& os, const md5_t& n);
 
 //---------------------------------------------------------------------------
 
+const int DBG_LEVEL   = 0;
+const int DBG_LEVEL_1 = 1;
+const int DBG_LEVEL_2 = 2;
+
+struct options_t
+{
+	int verbose = 0;
+	int64_t threshold = 0;
+	bool want_threshold = false;
+};
+std::ostream& dbg = std::clog;
+
+//---------------------------------------------------------------------------
+
 typedef std::multimap<md5_t, file_info_t> files_t;
-void scan(files_t& files, const std::string& name, int64_t threshold);
-void show_duplicates(const files_t& files);
+void scan(files_t& files, options_t& opts, const std::string& name);
+void show(const files_t& files, options_t& opts);
 
 //---------------------------------------------------------------------------
 
 int main(int argc, char* argv[])
 try
 {
-	int threshold = 0;
-	bool want_threshold = false;
-
+	options_t opts;
 	files_t files;
 	std::for_each(argv + 1, argv + argc, [&](const char* arg) {
-		if (strcmp(arg, "-s") == 0 || strcmp(arg, "--size") == 0) {
-			want_threshold = true;
+		if (strcmp(arg, "-v") == 0 || strcmp(arg, "--verbose") == 0) {
+			++opts.verbose;
 			return;
 		}
-		else if (want_threshold) {
-			threshold = atoi(arg);
-			want_threshold = false;
+		else if (strcmp(arg, "-s") == 0 || strcmp(arg, "--size") == 0) {
+			opts.want_threshold = true;
+			return;
+		}
+		else if (opts.want_threshold) {
+			opts.threshold = atoll(arg);
+			opts.want_threshold = false;
 			return;
 		}
 		else if (arg[0] == '-') {
 			throw std::runtime_error(std::string("bad arg: ") + arg);
 		}
 
-		scan(files, arg, threshold);
+		scan(files, opts, arg);
 	});
-	std::cout << "nfiles=" << files.size() << std::endl;
-	show_duplicates(files);
+	if (opts.verbose > DBG_LEVEL) dbg << "nfiles=" << files.size() << std::endl;
+	show(files, opts);
 }
 catch (const std::exception &e)
 {
@@ -109,10 +125,14 @@ catch (const std::exception &e)
 
 //---------------------------------------------------------------------------
 
-void scan_dir (files_t& files, const std::string& dir, int64_t threshold);
-void scan_file(files_t& files, file_info_t& file, int64_t threshold);
+void show_duplicates(const files_t& files, options_t& opts, std::ostream& os);
 
-void show_duplicates(const files_t& files)
+void show(const files_t& files, options_t& opts)
+{
+	show_duplicates(files, opts, std::cout);
+}
+
+void show_duplicates(const files_t& files, options_t& opts, std::ostream& os)
 {
 	if (files.empty()) return;
 
@@ -121,18 +141,18 @@ void show_duplicates(const files_t& files)
 	auto* val = &p->second;
 
 	for (;;) {
-		if ((++p) == files.end()) return;
+		if (++p == files.end()) return;
 
 		if (p->first == *key) {
-			std::cout << "\n";
-			std::cout << static_cast<std::string>(file_name(*val)) << "\n";
+			os << "\n";
+			os << static_cast<std::string>(file_name(*val)) << "\n";
 
 			do {
 				key = &p->first;
 				val = &p->second;
-				std::cout << static_cast<std::string>(file_name(*val)) << "\n";
+				os << static_cast<std::string>(file_name(*val)) << "\n";
 
-				if ((++p) == files.end()) return;
+				if (++p == files.end()) return;
 			}
 			while (p->first == *key);
 		}
@@ -144,40 +164,45 @@ void show_duplicates(const files_t& files)
 
 //---------------------------------------------------------------------------
 
-void scan(files_t& files, const std::string& name, int64_t threshold)
+void scan_dir (files_t& files, options_t& opts, const std::string& dir);
+void scan_file(files_t& files, options_t& opts, file_info_t& file);
+
+void scan(files_t& files, options_t& opts, const std::string& name)
 {
 	struct stat info;
 	if (stat(name.c_str(), &info) == -1) throw std::runtime_error("cannot open: " + name);
+	if (S_ISLNK(info.st_mode))           throw std::runtime_error("ignore link: " + name);
 
 	if (S_ISDIR(info.st_mode)) {
-		scan_dir(files, name, threshold);
+		scan_dir(files, opts, name);
 	}
-	if (S_ISREG(info.st_mode)) {
+	else if (S_ISREG(info.st_mode)) {
 		file_info_t rec = std::make_tuple(info.st_ino, info.st_nlink, info.st_size, name);
-		scan_file(files, rec, threshold);
+		scan_file(files, opts, rec);
 	}
 }
 
-void scan_dir(files_t& files, const std::string& dirname, int64_t threshold)
+void scan_dir(files_t& files, options_t& opts, const std::string& dirname)
 {
 	if (DIR* d = opendir(dirname.c_str())) {
 		while (struct dirent* entry = readdir(d)) {
-			if ((entry->d_name[0] == '.' && entry->d_name[1] == '\0') || (entry->d_name[0] == '.' && entry->d_name[1] == '.' && entry->d_name[2] == '\0'))
+			if ((entry->d_name[0] == '.' && entry->d_name[1] == '\0') ||
+				(entry->d_name[0] == '.' && entry->d_name[1] == '.' && entry->d_name[2] == '\0'))
 				continue;
 
-			std::string name = dirname + (dirname.back() != '/' ? std::string("/") : std::string()) + entry->d_name;
+			std::string name = dirname + std::string((dirname.back() != '/' ? 1 : 0), '/') + entry->d_name;
 
 			struct stat info;
 			if (stat(name.c_str(), &info) != -1) {
 				if (S_ISLNK(info.st_mode)) {
 					continue;
 				}
-				if (S_ISDIR(info.st_mode)) {
-					scan_dir(files, name, threshold);
+				else if (S_ISDIR(info.st_mode)) {
+					scan_dir(files, opts, name);
 				}
-				if (S_ISREG(info.st_mode)) {
+				else if (S_ISREG(info.st_mode)) {
 					file_info_t rec = std::make_tuple(info.st_ino, info.st_nlink, info.st_size, name);
-					scan_file(files, rec, threshold);
+					scan_file(files, opts, rec);
 				}
 			}
 		}
@@ -186,18 +211,21 @@ void scan_dir(files_t& files, const std::string& dirname, int64_t threshold)
 	}
 }
 
-void scan_file(files_t& files, file_info_t& info, int64_t threshold)
+void scan_file(files_t& files, options_t& opts, file_info_t& info)
 try
 {
 	std::string filename = file_name(info);
 	off_t       filesize = file_size(info);
 
-	static const off_t gig = 1024 * 1024 * 1024;
-	if (filesize > 4*gig)       throw std::runtime_error("skip large file: " + filename);
-	if (filesize < threshold)   throw std::runtime_error("threshold breach: " + filename);
+	const off_t K = 1024;
+	const off_t M = 1024 * K;
+	const off_t G = 1024 * M;
+	if (filesize > 4*G)            throw std::runtime_error("skip large file: " + filename);
+	if (filesize < opts.threshold) throw std::runtime_error("threshold breach: " + filename);
+	if (opts.verbose > DBG_LEVEL)  dbg << "filename: " << filename << "\n";
 
 	std::ifstream is(filename, std::ios::binary);
-	if (!is)                    throw std::runtime_error("cannot open: " + filename);
+	if (!is)                       throw std::runtime_error("cannot open: " + filename);
 
 	std::unique_ptr<char[]> buf(new char[filesize]);
 	is.read(buf.get(), file_size(info));
@@ -252,7 +280,9 @@ filename_t::filename_t(const std::string& str, const char* delimiter) : m_delimi
 		p = q + m_delimiter->size();
 		if (*p && memcmp(q, m_delimiter->c_str(), m_delimiter->size()) == 0) {
 			q += m_delimiter->size();
-			qlen = strstr(q, m_delimiter->c_str()) ? strstr(q, m_delimiter->c_str()) - q : strlen(q);
+
+			const char* r = strstr(q, m_delimiter->c_str());
+			qlen = r ? r - q : strlen(q);
 			m_path.emplace_back(sm_strings.emplace(q, qlen).first);
 		}
 	}
