@@ -19,6 +19,7 @@ public:
 	filename_t(const std::string& str, const char* delimiter = "/");
 	size_t size() const;
 	operator std::string () const;
+	std::string str() const;
 
 	size_t strings_size() const { return sm_strings.size(); }
 };

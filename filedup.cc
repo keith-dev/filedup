@@ -11,34 +11,99 @@
  */
 #include "filedup.hpp"
 #include "options.hpp"
+#include "md5.hpp"
+
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <fts.h>
+
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <stdexcept>
+#include <memory>
+
+#include <string.h>
 
 //---------------------------------------------------------------------------
 
 void scan_dir (files_t& files, options_t& opts, const std::string& dir);
 void scan_file(files_t& files, options_t& opts, file_info_t& file);
 
-void scan(files_t& files, options_t& opts, const std::string& name)
+#ifdef USE_FTS_CMP_CONST_PTR
+int mastercmp(const FTSENT * const *a, const FTSENT * const *b)
 {
-	struct stat info;
-	if (stat(name.c_str(), &info) == -1) throw std::runtime_error("cannot open: " + name);
-	if (S_ISLNK(info.st_mode))           throw std::runtime_error("ignore link: " + name);
+	return strcmp((*a)->fts_name, (*b)->fts_name);
+}
+#else
+int mastercmp(const FTSENT **a, const FTSENT **b)
+{
+	return strcmp((*a)->fts_name, (*b)->fts_name);
+}
+#endif
 
-	if (S_ISDIR(info.st_mode)) {
-		scan_dir(files, opts, name);
+void scan(files_t& files, options_t& opts, const std::string& name)
+try
+{
+	std::unique_ptr<char, void(*)(void*)> namech(strdup(name.c_str()), free);
+	char* paths[] = { namech.get(), nullptr };
+
+	std::unique_ptr<FTS, int(*)(FTS*)> ftsp(fts_open(paths, FTS_PHYSICAL|FTS_XDEV, mastercmp), fts_close);
+	if (!ftsp.get()) {
+		// 'name' is a one-off filename
+		struct stat info;
+		if (stat(name.c_str(), &info) != -1) {
+			file_info_t rec = make_fileinfo(info.st_ino, info.st_nlink, info.st_size, name);
+			scan_file(files, opts, rec);
+			return;
+		}
+
+		throw std::runtime_error("cannot access: " + name);
 	}
-	else if (S_ISREG(info.st_mode)) {
-		file_info_t rec = std::make_tuple(info.st_ino, info.st_nlink, info.st_size, name);
+
+	FTSENT *ftsentp = fts_read(ftsp.get());
+	switch (ftsentp->fts_info) {
+	case FTS_D:		// directory
+		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a directory\n";
+		scan_dir(files, opts, name);
+		break;
+	case FTS_F:	{	// file
+		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a file\n";
+		file_info_t rec = make_fileinfo(
+			ftsentp->fts_statp->st_ino,
+			ftsentp->fts_statp->st_nlink,
+			ftsentp->fts_statp->st_size,
+			name);
 		scan_file(files, opts, rec);
+		break;
+	}
+	case FTS_SL:	// symbolic link
+		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a symlink\n";
+		break;
+	case FTS_SLNONE:// symbolic link to nothing
+		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is symlink to nothing\n";
+		break;
+	case FTS_DC:	// cycle
+		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a cyclical reference\n";
+		break;
+	case FTS_DNR:	// directory cannot be read
+		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": cannot be read\n";
+		break;
+	case FTS_ERR:	// error
+		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": error\n";
+		break;
+	default:
+		;
 	}
 }
+catch (const std::exception &e)
+{
+	std::clog << e.what() << "\n";
+}
 
+// TODO: use fts stuff instead of dir stuff, integrate with scan(), and deprecate this function.
 void scan_dir(files_t& files, options_t& opts, const std::string& dirname)
 {
 	if (DIR* d = opendir(dirname.c_str())) {
@@ -48,20 +113,7 @@ void scan_dir(files_t& files, options_t& opts, const std::string& dirname)
 				continue;
 
 			std::string name = dirname + std::string((dirname.back() != '/' ? 1 : 0), '/') + entry->d_name;
-
-			struct stat info;
-			if (stat(name.c_str(), &info) != -1) {
-				if (S_ISLNK(info.st_mode)) {
-					continue;
-				}
-				else if (S_ISDIR(info.st_mode)) {
-					scan_dir(files, opts, name);
-				}
-				else if (S_ISREG(info.st_mode)) {
-					file_info_t rec = std::make_tuple(info.st_ino, info.st_nlink, info.st_size, name);
-					scan_file(files, opts, rec);
-				}
-			}
+			scan(files, opts, name);
 		}
 
 		closedir(d);
@@ -74,7 +126,7 @@ try
 	std::string filename = file_name(info);
 	off_t       filesize = file_size(info);
 
-	const off_t K = 1024;
+	const off_t K = 1024 * 1;
 	const off_t M = 1024 * K;
 	const off_t G = 1024 * M;
 	if (filesize > 4*G)            throw std::runtime_error("skip large file: " + filename);
@@ -85,11 +137,11 @@ try
 	if (!is)                       throw std::runtime_error("cannot open: " + filename);
 
 	std::unique_ptr<char[]> buf(new char[filesize]);
-	is.read(buf.get(), file_size(info));
+	is.read(buf.get(), filesize);
 
-	md5_t stamp;
-	MD5((unsigned char*)buf.get(), filesize, stamp.value);
-	files.emplace(std::make_pair(stamp, std::move(info)));
+	md5_t sig;
+	MD5((unsigned char*)buf.get(), filesize, sig.value);
+	files.emplace(std::make_pair(sig, std::move(info)));
 }
 catch (const std::bad_alloc &)
 {

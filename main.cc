@@ -1,5 +1,6 @@
 #include "filedup.hpp"
 #include "options.hpp"
+#include <algorithm>
 #include <iostream>
 
 int main(int argc, char* argv[])
