@@ -3,13 +3,25 @@
 #include <algorithm>
 #include <iostream>
 
+void usage();
+
 int main(int argc, char* argv[])
 try
 {
+	typedef std::vector<std::string> strings_t;
+
 	options_t opts;
-	files_t files;
-	std::for_each(argv + 1, argv + argc, [&](const char* arg) {
-		if (strcmp(arg, "-v") == 0 || strcmp(arg, "--verbose") == 0) {
+	strings_t args;
+	std::for_each(argv + 1, argv + argc, [&opts, &args](const char* arg) {
+		if (strcmp(arg, "-q") == 0 || strcmp(arg, "--quiet") == 0) {
+			if (opts.verbose != 1)
+				throw std::runtime_error(std::string("bad arg: -q and -v are mutually exclusive"));
+			opts.verbose = 0;
+			return;
+		}
+		else if (strcmp(arg, "-v") == 0 || strcmp(arg, "--verbose") == 0) {
+			if (opts.verbose == 0)
+				throw std::runtime_error(std::string("bad arg: -q and -v are mutually exclusive"));
 			++opts.verbose;
 			return;
 		}
@@ -17,23 +29,63 @@ try
 			opts.want_threshold = true;
 			return;
 		}
+		else if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+			usage();
+			return;
+		}
 		else if (opts.want_threshold) {
 			opts.threshold = atoll(arg);
 			opts.want_threshold = false;
+			return;
+		}
+		else if (strcmp(arg, "-x") == 0 || strcmp(arg, "--exclude") == 0) {
+			opts.want_exclude = true;
+			return;
+		}
+		else if (opts.want_exclude) {
+			opts.excludes.emplace_back(arg, std::regex_constants::ECMAScript);
+			opts.want_exclude = false;
 			return;
 		}
 		else if (arg[0] == '-') {
 			throw std::runtime_error(std::string("bad arg: ") + arg);
 		}
 
-		scan(files, opts, arg);
+		args.emplace_back(arg);
 	});
 
-	if (opts.verbose > DBG_LEVEL) dbg << "nfiles=" << files.size() << std::endl;
+	files_t files;
+	for (const std::string& arg : args)
+		scan(files, opts, arg);
 
+	if (opts.verbose > DBG_LEVEL_0) dbg << "nfiles=" << files.size() << "\n";
 	show(files, opts);
 }
 catch (const std::exception &e)
 {
-	std::clog << e.what() << "\n";
+	std::clog << "fatal: " << e.what() << "\n";
+}
+
+void usage()
+{
+	const char *text[] = {
+		"filedup -- Find duplicate files",
+		"\tfiledup [options] arg1 arg2 ... argn",
+		"\toptions:",
+		"\t-h, --help",
+		"\t\tshow this text",
+		"\t-q, --quiet",
+		"\t\tquiet mode, ignore warnings",
+		"\t-s, --size",
+		"\t\tminimum file size to process",
+		"\t-v, --verbose",
+		"\t\tincrease reported information",
+		"\t-x, --exclude",
+		"\t\texclude matching string",
+		nullptr
+	};
+
+	for (int i = 0; text[i]; ++i)
+		std::cout << text[i] << '\n';
+	std::cout.flush();
 }

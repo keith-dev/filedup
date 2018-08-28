@@ -9,26 +9,26 @@ filename_t::filename_t(const std::string& str, const char* delimiter) : m_delimi
 
 	if (!q) {
 		m_path.emplace_back(sm_strings.emplace(p).first);
-	} else {
-		if (p != q) {
-			m_path.emplace_back(sm_strings.emplace(p, q - p).first);
-		}
-
-		do {
-			size_t qlen = m_delimiter->size();
-			m_path.emplace_back(sm_strings.emplace(q, qlen).first);
-
-			p = q + m_delimiter->size();
-			if (*p && memcmp(q, m_delimiter->c_str(), m_delimiter->size()) == 0) {
-				q += m_delimiter->size();
-
-				const char* r = strstr(q, m_delimiter->c_str());
-				qlen = r ? r - q : strlen(q);
-				m_path.emplace_back(sm_strings.emplace(q, qlen).first);
-			}
-		}
-		while ((q = strstr(p, m_delimiter->c_str())));
+		return;
 	}
+
+	if (p != q)
+		m_path.emplace_back(sm_strings.emplace(p, q - p).first);
+
+	do {
+		size_t qlen = m_delimiter->size();
+		m_path.emplace_back(sm_strings.emplace(q, qlen).first);
+
+		p = q + m_delimiter->size();
+		if (*p && memcmp(q, m_delimiter->c_str(), m_delimiter->size()) == 0) {
+			q += m_delimiter->size();
+
+			const char* r = strstr(q, m_delimiter->c_str());
+			qlen = r ? r - q : strlen(q);
+			m_path.emplace_back(sm_strings.emplace(q, qlen).first);
+		}
+	}
+	while ((q = strstr(p, m_delimiter->c_str())));
 }
 
 size_t filename_t::size() const {
@@ -39,14 +39,14 @@ size_t filename_t::size() const {
 	return len;
 }
 
-filename_t::operator std::string () const {
-	return str();
-}
-
 std::string filename_t::str() const {
 	std::string str;
 	for (strings_t::const_iterator p : m_path)
 		str += *p;
 
 	return str;
+}
+
+filename_t::operator std::string () const {
+	return str();
 }

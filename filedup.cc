@@ -1,7 +1,7 @@
 /*
  * foreach directory
  * 	foreach file
- * 		map MD5 -> fullpath
+ *   map MD5 -> fullpath
  * 	endfor
  * endfor
  *
@@ -9,6 +9,14 @@
  * 	write all fullpaths
  * endfor
  */
+#ifdef __GNUC__
+  #if __x86_64__ || __ppc64__
+    #define BITS64 1
+  #else
+    #define BITS32 1
+  #endif
+#endif
+
 #include "filedup.hpp"
 #include "options.hpp"
 #include "md5.hpp"
@@ -47,15 +55,25 @@ int mastercmp(const FTSENT **a, const FTSENT **b)
 void scan(files_t& files, options_t& opts, const std::string& name)
 try
 {
-	std::unique_ptr<char, void(*)(void*)> namech(strdup(name.c_str()), free);
+	for (std::regex& regex : opts.excludes)
+		if (std::regex_search(name, regex))
+			 throw std::runtime_error("excluding: " + name);
+
+//	std::unique_ptr<char, void(*)(void*)> namech(strdup(name.c_str()), free);
+	std::unique_ptr<char, decltype(&free)> namech(strdup(name.c_str()), free);
 	char* paths[] = { namech.get(), nullptr };
 
-	std::unique_ptr<FTS, int(*)(FTS*)> ftsp(fts_open(paths, FTS_PHYSICAL|FTS_XDEV, mastercmp), fts_close);
+//	std::unique_ptr<FTS, int(*)(FTS*)> ftsp(fts_open(paths, FTS_PHYSICAL|FTS_XDEV, mastercmp), fts_close);
+	std::unique_ptr<FTS, decltype(&fts_close)> ftsp(fts_open(paths, FTS_PHYSICAL|FTS_XDEV, mastercmp), fts_close);
 	if (!ftsp.get()) {
 		// 'name' is a one-off filename
 		struct stat info;
 		if (stat(name.c_str(), &info) != -1) {
-			file_info_t rec = make_fileinfo(info.st_ino, info.st_nlink, info.st_size, name);
+			file_info_t rec = make_fileinfo(
+				info.st_ino,
+				info.st_nlink,
+				info.st_size,
+				name);
 			scan_file(files, opts, rec);
 			return;
 		}
@@ -66,11 +84,11 @@ try
 	FTSENT *ftsentp = fts_read(ftsp.get());
 	switch (ftsentp->fts_info) {
 	case FTS_D:		// directory
-		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a directory\n";
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type directory: " << name << "\n";
 		scan_dir(files, opts, name);
 		break;
 	case FTS_F:	{	// file
-		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a file\n";
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type file: " << name << "\n";
 		file_info_t rec = make_fileinfo(
 			ftsentp->fts_statp->st_ino,
 			ftsentp->fts_statp->st_nlink,
@@ -80,27 +98,27 @@ try
 		break;
 	}
 	case FTS_SL:	// symbolic link
-		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a symlink\n";
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type symlink: " << name << "\n";
 		break;
 	case FTS_SLNONE:// symbolic link to nothing
-		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is symlink to nothing\n";
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type symlink to nothing: " << name << "\n";
 		break;
 	case FTS_DC:	// cycle
-		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": is a cyclical reference\n";
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type cyclical reference: " << name << "\n";
 		break;
 	case FTS_DNR:	// directory cannot be read
-		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": cannot be read\n";
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type cannot be read: " << name << "\n";
 		break;
 	case FTS_ERR:	// error
-		if (opts.verbose > DBG_LEVEL_1) dbg << name << ": error\n";
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type error: " << name << "\n";
 		break;
 	default:
-		;
+		if (opts.verbose > DBG_LEVEL_1) dbg << "type unknow: " << name << "\n";
 	}
 }
 catch (const std::exception &e)
 {
-	std::clog << e.what() << "\n";
+	if (opts.verbose > DBG_LEVEL) dbg << e.what() << "\n";
 }
 
 // TODO: use fts stuff instead of dir stuff, integrate with scan(), and deprecate this function.
@@ -129,12 +147,18 @@ try
 	const off_t K = 1024 * 1;
 	const off_t M = 1024 * K;
 	const off_t G = 1024 * M;
-	if (filesize > 4*G)            throw std::runtime_error("skip large file: " + filename);
-	if (filesize < opts.threshold) throw std::runtime_error("threshold breach: " + filename);
-	if (opts.verbose > DBG_LEVEL)  dbg << "filename: " << filename << "\n";
+
+#ifdef BITS64
+	if (filesize > 4*G-1)           throw std::runtime_error("skip large file: " + filename);
+#endif
+#ifdef BITS32
+	if (filesize > 2*G-1)           throw std::runtime_error("skip large file: " + filename);
+#endif
+	if (filesize < opts.threshold)  throw std::runtime_error("threshold breach: " + filename);
+	if (opts.verbose > DBG_LEVEL_0) dbg << "filename: " << filename << "\n";
 
 	std::ifstream is(filename, std::ios::binary);
-	if (!is)                       throw std::runtime_error("cannot open: " + filename);
+	if (!is)                        throw std::runtime_error("cannot open: " + filename);
 
 	std::unique_ptr<char[]> buf(new char[filesize]);
 	is.read(buf.get(), filesize);
@@ -146,11 +170,11 @@ try
 catch (const std::bad_alloc &)
 {
 	std::string filename = file_name(info);
-	std::clog << "file too large: " << filename << "\n";
+	if (opts.verbose > DBG_LEVEL) dbg << "file too large: " << filename << "\n";
 }
 catch (const std::exception &e)
 {
-	std::clog << e.what() << "\n";
+	if (opts.verbose > DBG_LEVEL) dbg << e.what() << "\n";
 }
 
 //---------------------------------------------------------------------------

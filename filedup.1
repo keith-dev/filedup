@@ -31,7 +31,7 @@
 .\"     From: @(#)uniq.1	8.1 (Berkeley) 6/6/93
 .\" $FreeBSD: releng/11.1/usr.bin/uniq/uniq.1 319226 2017-05-30 16:55:15Z emaste $
 .\"
-.Dd Mar 19, 2018
+.Dd Aug 28, 2018
 .Dt FILEDUP 1
 .Os
 .Sh NAME
@@ -56,12 +56,17 @@ the
 .Pp
 The following options are available:
 .Bl -tag -width Ds
-.It Fl v
-Increase verbosity level.
+.It Fl q
+Quiet mode, no warnings.
 .It Fl s Ar num
 Ignore files smaller than
 .Ar num
 bytes.
+.It Fl v
+Increase verbosity level.
+.It Fl x Ar expr
+Ignore file names that match
+.Ar expr
 .El
 .Sh EXIT STATUS
 .Ex -std
