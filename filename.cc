@@ -1,6 +1,7 @@
 #include "filename.hpp"
 #include <string.h>
 
+const std::string filename_t::sm_empty;
 filename_t::strings_t filename_t::sm_strings;
 
 filename_t::filename_t(const std::string& str, const char* delimiter) : m_delimiter(sm_strings.emplace(delimiter).first) {
@@ -45,6 +46,12 @@ std::string filename_t::str() const {
 		str += *p;
 
 	return str;
+}
+
+const std::string& filename_t::last() const {
+	if (m_path.empty())
+		return sm_empty;
+	return **m_path.crbegin();
 }
 
 filename_t::operator std::string () const {

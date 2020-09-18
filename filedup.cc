@@ -34,11 +34,9 @@
 #include <memory>
 
 #include <string.h>
-#include <stdio.h>
-
 //---------------------------------------------------------------------------
 
-void scan_file(files_t& files, options_t& opts, file_info_t& file);
+void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t& file);
 
 #ifdef USE_FTS_CMP_CONST_PTR
 int mastercmp(const FTSENT * const *a, const FTSENT * const *b)
@@ -52,7 +50,7 @@ int mastercmp(const FTSENT **a, const FTSENT **b)
 }
 #endif
 
-void scan(files_t& files, options_t& opts, const std::string& name)
+void scan(file_stamps_t& file_stamps, options_t& opts, std::string name)
 try
 {
 	for (std::regex& regex : opts.excludes)
@@ -71,8 +69,8 @@ try
 				info.st_ino,
 				info.st_nlink,
 				info.st_size,
-				name);
-			scan_file(files, opts, rec);
+				std::move(name));
+			scan_file(file_stamps, opts, rec);
 			return;
 		}
 
@@ -86,30 +84,24 @@ try
 	switch (ftsentp->fts_info) {
 	case FTS_D:		// directory
 		if (opts.verbose > DBG_LEVEL_1) dbg << "type directory: " << name << "\n";
-		if (FTSENT* ftschild = fts_children(ftsp.get(), 0)) {
-			std::string name;
+		for (FTSENT* ftschild = fts_children(ftsp.get(), 0); ftschild; ftschild = ftschild->fts_link) {
+			name.reserve(ftsentp->fts_pathlen + 1 + ftschild->fts_namelen);
+			name  = ftsentp->fts_path;
+			if (name.back() != '/')
+			    name += "/";
+			name += ftschild->fts_name;
 
-			do {
-				name.reserve(std::max(name.capacity(), ftsentp->fts_pathlen + 1 + ftschild->fts_namelen));
-				name  = ftsentp->fts_path;
-				name += "/";
-				name += ftschild->fts_name;
-
-				if (S_ISDIR(ftschild->fts_statp->st_mode)) {
-					scan(files, opts, name);
-				}
-				else {
-					file_info_t rec = make_fileinfo(
-						ftschild->fts_statp->st_ino,
-						ftschild->fts_statp->st_nlink,
-						ftschild->fts_statp->st_size,
-						std::move(name));
-					scan_file(files, opts, rec);
-				}
-
-				ftschild = ftschild->fts_link;
+			if (S_ISDIR(ftschild->fts_statp->st_mode)) {
+				scan(file_stamps, opts, std::move(name));
 			}
-			while (ftschild);
+			else if (S_ISREG(ftschild->fts_statp->st_mode)) {
+				file_info_t rec = make_fileinfo(
+					ftschild->fts_statp->st_ino,
+					ftschild->fts_statp->st_nlink,
+					ftschild->fts_statp->st_size,
+					std::move(name));
+				scan_file(file_stamps, opts, rec);
+			}
 		}
 		break;
 	case FTS_F:	{	// file
@@ -118,8 +110,8 @@ try
 			ftsentp->fts_statp->st_ino,
 			ftsentp->fts_statp->st_nlink,
 			ftsentp->fts_statp->st_size,
-			name);
-		scan_file(files, opts, rec);
+			std::move(name));
+		scan_file(file_stamps, opts, rec);
 		break;
 	}
 	case FTS_SL:	// symbolic link
@@ -154,7 +146,7 @@ namespace {
 	context_t ctx;
 }
 
-void scan_file(files_t& files, options_t& opts, file_info_t& info)
+void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t& info)
 try
 {
 	const std::string filename = file_name(info);
@@ -175,7 +167,7 @@ try
 	md5_t sig;
 	MD5_Final(sig.value, &md_context);
 
-	files.emplace(std::make_pair(sig, std::move(info)));
+	file_stamps.emplace(std::move(sig), std::move(info));
 }
 catch (const std::bad_alloc &)
 {
@@ -190,16 +182,16 @@ catch (const std::exception &e)
 //---------------------------------------------------------------------------
 
 namespace {
-	void show_duplicates(const files_t& files, options_t& opts, std::ostream& os)
+	void show_duplicates(const file_stamps_t& file_stamps, options_t& opts, std::ostream& os)
 	{
-		if (files.empty()) return;
+		if (file_stamps.files.empty()) return;
 
-		auto p = files.begin();
+		auto p = file_stamps.files.begin();
 		auto* key = &p->first;
 		auto* val = &p->second;
 
 		for (;;) {
-			if (++p == files.end()) return;
+			if (++p == file_stamps.files.end()) return;
 
 			if (p->first == *key) {
 				os << "\n";
@@ -210,7 +202,7 @@ namespace {
 					val = &p->second;
 					os << static_cast<std::string>(file_name(*val)) << "\n";
 
-					if (++p == files.end()) return;
+					if (++p == file_stamps.files.end()) return;
 				}
 				while (p->first == *key);
 			}
@@ -221,7 +213,7 @@ namespace {
 	}
 }
 
-void show(const files_t& files, options_t& opts)
+void show(const file_stamps_t& file_stamps, options_t& opts)
 {
-	show_duplicates(files, opts, std::cout);
+	show_duplicates(file_stamps, opts, std::cout);
 }

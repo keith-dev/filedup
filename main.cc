@@ -54,12 +54,12 @@ try
 		args.emplace_back(arg);
 	});
 
-	files_t files;
+	file_stamps_t file_stamps;
 	for (const std::string& arg : args)
-		scan(files, opts, arg);
+		scan(file_stamps, opts, arg);
 
-	if (opts.verbose > DBG_LEVEL_0) dbg << "nfiles=" << files.size() << "\n";
-	show(files, opts);
+	if (opts.verbose > DBG_LEVEL_0) dbg << "nfiles=" << file_stamps.files.size() << "\n";
+	show(file_stamps, opts);
 }
 catch (const std::exception &e)
 {
