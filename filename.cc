@@ -42,6 +42,7 @@ size_t filename_t::size() const {
 
 std::string filename_t::str() const {
 	std::string str;
+	str.reserve(size());
 	for (strings_t::const_iterator p : m_path)
 		str += *p;
 

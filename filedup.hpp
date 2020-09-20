@@ -9,7 +9,9 @@
 struct options_t;
 
 //---------------------------------------------------------------------------
-/*
+
+#ifdef TUPLE_FILEINFO
+
 typedef std::tuple<ino_t, nlink_t, off_t, filename_t> file_info_t;
 
 inline file_info_t make_fileinfo(ino_t ino, nlink_t nlink, off_t size, std::string name) {
@@ -24,9 +26,9 @@ inline filename_t&  file_name(file_info_t& info)		{ return std::get<3>(info); }
 inline ino_t        file_inode(const file_info_t& info)	{ return std::get<0>(info); }
 inline nlink_t      file_links(const file_info_t& info)	{ return std::get<1>(info); }
 inline off_t        file_size(const file_info_t& info)	{ return std::get<2>(info); }
-inline filename_t   file_name(const file_info_t& info)	{ return std::get<3>(info); }
- */
-//---------------------------------------------------------------------------
+inline const filename_t& file_name(const file_info_t& info)	{ return std::get<3>(info); }
+
+#else	//-------------------------------------------------------------------
 
 struct file_info_t
 {
@@ -55,7 +57,9 @@ inline filename_t&	file_name(file_info_t& info)		{ return info.name; }
 inline ino_t		file_inode(const file_info_t& info)	{ return info.inode; }
 inline nlink_t		file_links(const file_info_t& info)	{ return info.nlink; }
 inline off_t		file_size(const file_info_t& info)	{ return info.size; }
-inline std::string	file_name(const file_info_t& info)	{ return info.name; }
+inline const filename_t& file_name(const file_info_t& info)	{ return info.name; }
+
+#endif	// TUPLE_FILEINFO
 
 //---------------------------------------------------------------------------
 
@@ -103,6 +107,8 @@ inline void file_stamps_t::emplace(md5_t md5, file_info_t file_info) {
 			std::forward_as_tuple(&p->second.name.last()),
 			std::forward_as_tuple(p->first));
 }
+
+//---------------------------------------------------------------------------
 
 void scan(file_stamps_t& file_stamps, options_t& opts, std::string name);
 void show(const file_stamps_t& file_stamps, options_t& opts);

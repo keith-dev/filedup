@@ -34,9 +34,10 @@
 #include <memory>
 
 #include <string.h>
+
 //---------------------------------------------------------------------------
 
-void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t& file);
+void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t file);
 
 #ifdef USE_FTS_CMP_CONST_PTR
 int mastercmp(const FTSENT * const *a, const FTSENT * const *b)
@@ -70,7 +71,7 @@ try
 				info.st_nlink,
 				info.st_size,
 				std::move(name));
-			scan_file(file_stamps, opts, rec);
+			scan_file(file_stamps, opts, std::move(rec));
 			return;
 		}
 
@@ -85,6 +86,7 @@ try
 	case FTS_D:		// directory
 		if (opts.verbose > DBG_LEVEL_1) dbg << "type directory: " << name << "\n";
 		for (FTSENT* ftschild = fts_children(ftsp.get(), 0); ftschild; ftschild = ftschild->fts_link) {
+			std::string name;
 			name.reserve(ftsentp->fts_pathlen + 1 + ftschild->fts_namelen);
 			name  = ftsentp->fts_path;
 			if (name.back() != '/')
@@ -100,7 +102,7 @@ try
 					ftschild->fts_statp->st_nlink,
 					ftschild->fts_statp->st_size,
 					std::move(name));
-				scan_file(file_stamps, opts, rec);
+				scan_file(file_stamps, opts, std::move(rec));
 			}
 		}
 		break;
@@ -111,7 +113,7 @@ try
 			ftsentp->fts_statp->st_nlink,
 			ftsentp->fts_statp->st_size,
 			std::move(name));
-		scan_file(file_stamps, opts, rec);
+		scan_file(file_stamps, opts, std::move(rec));
 		break;
 	}
 	case FTS_SL:	// symbolic link
@@ -146,7 +148,7 @@ namespace {
 	context_t ctx;
 }
 
-void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t& info)
+void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t info)
 try
 {
 	const std::string filename = file_name(info);
