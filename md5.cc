@@ -2,7 +2,7 @@
 #include <ostream>
 #include <iomanip>
 
-std::ostream& md5(std::ostream& os, const md5_t& n)
+std::ostream& operator<<(std::ostream& os, const md5_t& n)
 {
 	os << std::hex;
 	for (int i = 0; i != MD5_DIGEST_LENGTH; ++i)

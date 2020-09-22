@@ -3,7 +3,7 @@ SRCS     = filename.cc  options.cc  md5.cc  filedup.cc  main.cc
 INCS     = filename.hpp options.hpp md5.hpp filedup.hpp
 MAN      = filedup.1
 
-CXXFLAGS += -g -std=c++17 -pedantic -Wall -Wextra -Wno-unused-parameter
+CXXFLAGS += -O3 -g -std=c++17 -pedantic -Wall -Wextra -Wno-unused-parameter
 LDADD    += -lcrypto
 
 DEPENDS  = $(PROG_CXX).depends

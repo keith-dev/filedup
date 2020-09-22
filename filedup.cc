@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <fts.h>
 
+#include <sstream>
 #include <iostream>
 #include <iomanip>
 #include <stdexcept>
@@ -40,20 +41,17 @@
 void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t file);
 
 #ifdef USE_FTS_CMP_CONST_PTR
-int mastercmp(const FTSENT * const *a, const FTSENT * const *b)
-{
+int mastercmp(const FTSENT * const *a, const FTSENT * const *b) {
 	return strcmp((*a)->fts_name, (*b)->fts_name);
 }
 #else
-int mastercmp(const FTSENT **a, const FTSENT **b)
-{
+int mastercmp(const FTSENT **a, const FTSENT **b) {
 	return strcmp((*a)->fts_name, (*b)->fts_name);
 }
 #endif
 
 void scan(file_stamps_t& file_stamps, options_t& opts, std::string name)
-try
-{
+try {
 	for (std::regex& regex : opts.excludes)
 		if (std::regex_search(name, regex))
 			 throw std::runtime_error("excluding: " + name);
@@ -66,12 +64,14 @@ try
 		// 'name' is a one-off filename
 		struct stat info;
 		if (stat(name.c_str(), &info) != -1) {
-			file_info_t rec = make_fileinfo(
-				info.st_ino,
-				info.st_nlink,
-				info.st_size,
-				std::move(name));
-			scan_file(file_stamps, opts, std::move(rec));
+			if (opts.threshold <= info.st_size) {
+				file_info_t rec = make_fileinfo(
+					info.st_ino,
+					info.st_nlink,
+					info.st_size,
+					std::move(name));
+				scan_file(file_stamps, opts, std::move(rec));
+			}
 			return;
 		}
 
@@ -108,12 +108,14 @@ try
 		break;
 	case FTS_F:	{	// file
 		if (opts.verbose > DBG_LEVEL_1) dbg << "type file: " << name << "\n";
-		file_info_t rec = make_fileinfo(
-			ftsentp->fts_statp->st_ino,
-			ftsentp->fts_statp->st_nlink,
-			ftsentp->fts_statp->st_size,
-			std::move(name));
-		scan_file(file_stamps, opts, std::move(rec));
+		if (opts.threshold <= ftsentp->fts_statp->st_size) {
+			file_info_t rec = make_fileinfo(
+				ftsentp->fts_statp->st_ino,
+				ftsentp->fts_statp->st_nlink,
+				ftsentp->fts_statp->st_size,
+				std::move(name));
+			scan_file(file_stamps, opts, std::move(rec));
+		}
 		break;
 	}
 	case FTS_SL:	// symbolic link
@@ -135,8 +137,7 @@ try
 		if (opts.verbose > DBG_LEVEL_1) dbg << "type unknow: " << name << "\n";
 	}
 }
-catch (const std::exception &e)
-{
+catch (const std::exception &e) {
 	if (opts.verbose > DBG_LEVEL) dbg << e.what() << "\n";
 }
 
@@ -149,8 +150,7 @@ namespace {
 }
 
 void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t info)
-try
-{
+try {
 	const std::string filename = file_name(info);
 
 	MD5_CTX md_context;
@@ -171,51 +171,70 @@ try
 
 	file_stamps.emplace(std::move(sig), std::move(info));
 }
-catch (const std::bad_alloc &)
-{
+catch (const std::bad_alloc &) {
 	const std::string filename = file_name(info);
 	if (opts.verbose > DBG_LEVEL) dbg << "file too large: " << filename << "\n";
 }
-catch (const std::exception &e)
-{
+catch (const std::exception &e) {
 	if (opts.verbose > DBG_LEVEL) dbg << e.what() << "\n";
 }
 
 //---------------------------------------------------------------------------
 
-namespace {
-	void show_duplicates(const file_stamps_t& file_stamps, options_t& opts, std::ostream& os)
-	{
-		if (file_stamps.files.empty()) return;
-
-		auto p = file_stamps.files.begin();
-		auto* key = &p->first;
-		auto* val = &p->second;
-
-		for (;;) {
-			if (++p == file_stamps.files.end()) return;
-
-			if (p->first == *key) {
-				os << "\n";
-				os << static_cast<std::string>(file_name(*val)) << "\n";
-
-				do {
-					key = &p->first;
-					val = &p->second;
-					os << static_cast<std::string>(file_name(*val)) << "\n";
-
-					if (++p == file_stamps.files.end()) return;
-				}
-				while (p->first == *key);
-			}
-
-			key = &p->first;
-			val = &p->second;
-		}
-	}
+std::string file_stamps_t::to_json() const {
+	std::ostringstream os;
+	to_json(os);;
+	return os.str();
 }
 
-void show(const file_stamps_t& file_stamps, options_t& opts)
-{
-	show_duplicates(file_stamps, opts, std::cout);
+file_stamps_t file_stamps_t::from_json(std::string json) {
+	return file_stamps_t();
+}
+
+std::ostream& file_stamps_t::to_json(std::ostream& os) const {
+	os << "{\n";
+
+	os << "  \"md5s\": [";
+	for (auto p = files.cbegin(); p != files.cend(); ++p) {
+		if (p != files.cbegin())
+			os << ",";
+		os << "\n    {\"md5\": \"" << p->first << "\", \"paths\": [";
+		for (auto q = p->second.cbegin(); q != p->second.cend(); ++q) {
+			if (q != p->second.cbegin())
+				os << ", ";
+			os << "\"" << file_name(*q).str() << "\"";
+		}
+		os << "]}";
+	}
+	os << "\n  ],\n";
+
+	os << "  \"files\": [";
+	for (auto p = stamps.cbegin(); p != stamps.cend(); ++p) {
+		if (p != stamps.cbegin())
+			os << ",";
+		os << "\n    {\"file\": \"" << *p->first << "\", \"md5s\": [";
+		for (auto q = p->second.cbegin(); q != p->second.cend(); ++q) {
+			if (q != p->second.cbegin())
+				os << ", ";
+			os << "\"" << **q << "\"";
+		}
+		os << "]}";
+	}
+	os << "\n  ]\n";
+
+	os << "}\n";
+	return os;
+}
+
+namespace {
+/*
+	std::ostream& to_json(std::ostream& os, const file_stamps_t& file_stamps) {
+		return file_stamps.to_json(os);
+	}
+ */
+}
+
+void show(const file_stamps_t& file_stamps, options_t& opts) {
+//	to_json(file_stamps, opts, std::cout);
+	file_stamps.to_json(std::cout);
 }

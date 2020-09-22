@@ -85,7 +85,7 @@ void usage()
 		nullptr
 	};
 
-	for (int i = 0; text[i]; ++i)
+	for (size_t i = 0; text[i]; ++i)
 		std::cout << text[i] << '\n';
 	std::cout.flush();
 }

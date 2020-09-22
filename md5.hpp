@@ -11,4 +11,4 @@ struct md5_t
 inline bool operator< (const md5_t& a, const md5_t& b) { return memcmp(a.value, b.value, MD5_DIGEST_LENGTH) <  0; }
 inline bool operator==(const md5_t& a, const md5_t& b) { return memcmp(a.value, b.value, MD5_DIGEST_LENGTH) == 0; }
 
-std::ostream& md5(std::ostream& os, const md5_t& n);
+std::ostream& operator<<(std::ostream& os, const md5_t& n);
