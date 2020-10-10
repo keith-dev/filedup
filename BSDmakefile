@@ -1,9 +1,15 @@
-PROG_CXX = filedup
-SRCS     = filename.cc  options.cc  md5.cc  filedup.cc  main.cc
-INCS     = filename.hpp options.hpp md5.hpp filedup.hpp
-MAN      = filedup.1
+# ---------------------------------------------------------------------------
+#	Copyright (c) 2013-20 Keith Williams.
+#	All rights reserved.
+#
+#	Redistribution and use in source and binary forms are permitted
+#	provided that the above copyright notice and this paragraph are
+#	duplicated in all such forms and that any documentation,
+#	advertising materials, and other materials related to such
+#	distribution and use acknowledge that the software was developed
+#	by Webbusy Ltd.
+# ---------------------------------------------------------------------------
 
-CXXFLAGS  = -O3 -g -std=c++17 -Wall -Wextra -Wno-unused-const-variable -Wno-unused-parameter -DUSE_FTS_CMP_CONST_PTR
-LDFLAGS  += -lcrypto
+SUBDIR = libfiledup filedup
 
-.include <bsd.prog.mk>
+.include <bsd.subdir.mk>

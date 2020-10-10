@@ -1,5 +1,6 @@
-#include "filedup.hpp"
-#include "options.hpp"
+#include <filedup/filedup.hpp>
+#include <filedup/options.hpp>
+
 #include <algorithm>
 #include <iostream>
 

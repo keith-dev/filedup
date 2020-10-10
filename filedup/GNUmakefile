@@ -10,14 +10,20 @@
 #	by Webbusy Ltd.
 # ---------------------------------------------------------------------------
 
-SUBDIR = filedup src
+SHLIB = filedup
+SHLIB_MAJOR = 0.0
+SHNAME = lib$(SHLIB).so
+SHLIBNAME = $(SHNAME).$(SHLIB_MAJOR)
 
-.PHONY: $(SUBDIR)
+SRCS = options.cc md5.cc filename.cc filedup.cc
 
-all: $(SUBDIR)
+CXXFLAGS += -g -fpic -std=c++17 -pedantic -Wall -Wextra
+all: $(SHLIBNAME)
 
 clean:
-	for P in $(SUBDIR); do $(MAKE) --directory=$$P clean; done
+	- rm $(SHLIBNAME) $(SHNAME) $(SRCS:.cc=.o)
 
-$(SUBDIR):
-	$(MAKE) RELEASE=$(RELEASE) -C $@
+$(SHLIBNAME): $(SRCS:.cc=.o)
+	$(LINK.c) -shared -o $@ $^
+	- rm $(SHNAME)
+	ln -s $(SHLIBNAME) $(SHNAME)

@@ -10,14 +10,12 @@
 #	by Webbusy Ltd.
 # ---------------------------------------------------------------------------
 
-SUBDIR = filedup src
+PROG_CXX = filedup
+SRCS     = filename.cc  options.cc  md5.cc  filedup.cc  main.cc
+INCS     = filename.hpp options.hpp md5.hpp filedup.hpp
+MAN      = filedup.1
 
-.PHONY: $(SUBDIR)
+CXXFLAGS  = -O3 -g -std=c++17 -Wall -Wextra -Wno-unused-const-variable -Wno-unused-parameter -DUSE_FTS_CMP_CONST_PTR
+LDFLAGS  += -lcrypto
 
-all: $(SUBDIR)
-
-clean:
-	for P in $(SUBDIR); do $(MAKE) --directory=$$P clean; done
-
-$(SUBDIR):
-	$(MAKE) RELEASE=$(RELEASE) -C $@
+.include <bsd.prog.mk>
