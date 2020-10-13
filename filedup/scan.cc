@@ -17,7 +17,7 @@
   #endif
 #endif
 
-#include "filedup.hpp"
+#include "filestamps.hpp"
 #include "options.hpp"
 #include "md5.hpp"
 
@@ -28,11 +28,7 @@
 #include <fcntl.h>
 #include <fts.h>
 
-#include <sstream>
 #include <iostream>
-#include <iomanip>
-#include <stdexcept>
-#include <memory>
 
 #include <string.h>
 
@@ -182,60 +178,6 @@ catch (const std::exception &e) {
 
 //---------------------------------------------------------------------------
 
-std::string file_stamps_t::to_json() const {
-	std::ostringstream os;
-	to_json(os);;
-	return os.str();
-}
-
-file_stamps_t file_stamps_t::from_json(std::string json) {
-	return file_stamps_t();
-}
-
-std::ostream& file_stamps_t::to_json(std::ostream& os) const {
-	os << "{\n";
-
-	os << "  \"md5s\": [";
-	for (auto p = files.cbegin(); p != files.cend(); ++p) {
-		if (p != files.cbegin())
-			os << ",";
-		os << "\n    {\"md5\": \"" << p->first << "\", \"paths\": [";
-		for (auto q = p->second.cbegin(); q != p->second.cend(); ++q) {
-			if (q != p->second.cbegin())
-				os << ", ";
-			os << "\"" << file_name(*q).str() << "\"";
-		}
-		os << "]}";
-	}
-	os << "\n  ],\n";
-
-	os << "  \"files\": [";
-	for (auto p = stamps.cbegin(); p != stamps.cend(); ++p) {
-		if (p != stamps.cbegin())
-			os << ",";
-		os << "\n    {\"file\": \"" << *p->first << "\", \"md5s\": [";
-		for (auto q = p->second.cbegin(); q != p->second.cend(); ++q) {
-			if (q != p->second.cbegin())
-				os << ", ";
-			os << "\"" << **q << "\"";
-		}
-		os << "]}";
-	}
-	os << "\n  ]\n";
-
-	os << "}\n";
-	return os;
-}
-
-namespace {
-/*
-	std::ostream& to_json(std::ostream& os, const file_stamps_t& file_stamps) {
-		return file_stamps.to_json(os);
-	}
- */
-}
-
-void show(const file_stamps_t& file_stamps, const options_t& opts) {
-//	to_json(file_stamps, opts, std::cout);
+void show(const file_stamps_t& file_stamps, const options_t& /*opts*/) {
 	file_stamps.to_json(std::cout);
 }

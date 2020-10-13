@@ -23,12 +23,12 @@ std::tuple<options_t, args_t> options_t::create(int argc, char* argv[], usage_fu
 		auto threshold = [&opts, &want_threshold]() {
 			want_threshold = true;
 			if (!opts.threshold)
-				opts.threshold = {};
+				opts.threshold = decltype(opts.threshold)::value_type();
 		};
 		auto exclude = [&opts, &want_exclude]() {
 			want_exclude = true;
 			if (!opts.excludes)
-				opts.excludes = {};
+				opts.excludes = decltype(opts.excludes)::value_type();
 		};
 
 		if (stop_arg_processing) {

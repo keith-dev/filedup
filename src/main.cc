@@ -1,5 +1,6 @@
 #include <filedup/options.hpp>
-#include <filedup/filedup.hpp>
+#include <filedup/scan.hpp>
+#include <filedup/filestamps.hpp>
 
 #include <iostream>
 
