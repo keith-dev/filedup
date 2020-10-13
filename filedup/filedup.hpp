@@ -112,5 +112,5 @@ inline void file_stamps_t::emplace(md5_t md5, file_info_t file_info) {
 
 //---------------------------------------------------------------------------
 
-void scan(file_stamps_t& file_stamps, options_t& opts, std::string name);
-void show(const file_stamps_t& file_stamps, options_t& opts);
+void scan(file_stamps_t& file_stamps, const options_t& opts, std::string name);
+void show(const file_stamps_t& file_stamps, const options_t& opts);

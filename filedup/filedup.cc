@@ -38,7 +38,7 @@
 
 //---------------------------------------------------------------------------
 
-void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t file);
+void scan_file(file_stamps_t& file_stamps, const options_t& opts, file_info_t file);
 
 #ifdef USE_FTS_CMP_CONST_PTR
 int mastercmp(const FTSENT * const *a, const FTSENT * const *b) {
@@ -50,11 +50,12 @@ int mastercmp(const FTSENT **a, const FTSENT **b) {
 }
 #endif
 
-void scan(file_stamps_t& file_stamps, options_t& opts, std::string name)
+void scan(file_stamps_t& file_stamps, const options_t& opts, std::string name)
 try {
-	for (std::regex& regex : opts.excludes)
-		if (std::regex_search(name, regex))
-			 throw std::runtime_error("excluding: " + name);
+	if (opts.excludes)
+		for (const std::regex& regex : *opts.excludes)
+			if (std::regex_search(name, regex))
+				 throw std::runtime_error("excluding: " + name);
 
 	std::unique_ptr<char, decltype(&free)> namech(strdup(name.c_str()), free);
 	char* paths[] = { namech.get(), nullptr };
@@ -64,7 +65,7 @@ try {
 		// 'name' is a one-off filename
 		struct stat info;
 		if (stat(name.c_str(), &info) != -1) {
-			if (opts.threshold <= info.st_size) {
+			if (opts.threshold.value_or(0) <= info.st_size) {
 				file_info_t rec = make_fileinfo(
 					info.st_ino,
 					info.st_nlink,
@@ -84,7 +85,7 @@ try {
 
 	switch (ftsentp->fts_info) {
 	case FTS_D:		// directory
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type directory: " << name << "\n";
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type directory: " << name << "\n";
 		for (FTSENT* ftschild = fts_children(ftsp.get(), 0); ftschild; ftschild = ftschild->fts_link) {
 			std::string name;
 			name.reserve(ftsentp->fts_pathlen + 1 + ftschild->fts_namelen);
@@ -107,8 +108,8 @@ try {
 		}
 		break;
 	case FTS_F:	{	// file
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type file: " << name << "\n";
-		if (opts.threshold <= ftsentp->fts_statp->st_size) {
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type file: " << name << "\n";
+		if (opts.threshold.value_or(0) <= ftsentp->fts_statp->st_size) {
 			file_info_t rec = make_fileinfo(
 				ftsentp->fts_statp->st_ino,
 				ftsentp->fts_statp->st_nlink,
@@ -119,22 +120,22 @@ try {
 		break;
 	}
 	case FTS_SL:	// symbolic link
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type symlink: " << name << "\n";
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type symlink: " << name << "\n";
 		break;
 	case FTS_SLNONE:// symbolic link to nothing
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type symlink to nothing: " << name << "\n";
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type symlink to nothing: " << name << "\n";
 		break;
 	case FTS_DC:	// cycle
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type cyclical reference: " << name << "\n";
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type cyclical reference: " << name << "\n";
 		break;
 	case FTS_DNR:	// directory cannot be read
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type cannot be read: " << name << "\n";
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type cannot be read: " << name << "\n";
 		break;
 	case FTS_ERR:	// error
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type error: " << name << "\n";
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type error: " << name << "\n";
 		break;
 	default:
-		if (opts.verbose > DBG_LEVEL_1) dbg << "type unknow: " << name << "\n";
+		if (opts.verbose.value_or(0) > DBG_LEVEL_0) dbg << "type unknow: " << name << "\n";
 	}
 }
 catch (const std::exception &e) {
@@ -149,7 +150,7 @@ namespace {
 	context_t ctx;
 }
 
-void scan_file(file_stamps_t& file_stamps, options_t& opts, file_info_t info)
+void scan_file(file_stamps_t& file_stamps, const options_t& opts, file_info_t info)
 try {
 	const std::string filename = file_name(info);
 
@@ -234,7 +235,7 @@ namespace {
  */
 }
 
-void show(const file_stamps_t& file_stamps, options_t& opts) {
+void show(const file_stamps_t& file_stamps, const options_t& opts) {
 //	to_json(file_stamps, opts, std::cout);
 	file_stamps.to_json(std::cout);
 }
