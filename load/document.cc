@@ -30,89 +30,17 @@ Document::Document(const char* filename) : filename_(filename) {
 }
 
 bool Document::parse(Document& doc, const rapidjson::Document& json, size_t level) {
-	std::cout << std::string(levelMultiplier_*level, ' ') << "Type:" << kTypeNames_[json.GetType()] << '\n';
-
 	if (json.IsObject()) {
-		for (rapidjson::Value::ConstMemberIterator p = json.MemberBegin(); p != json.MemberEnd(); ++p) {
-			std::cout << std::string(levelMultiplier_*level, ' ')
-				<< "name:" << p->name.GetString()
-				<< " type:" << kTypeNames_[p->value.GetType()]
-				<< '\n';
-			switch (json.GetType()) {
-			case rapidjson::kNullType:
-				std::cout << std::string(levelMultiplier_*level, ' ')
-					<< "(null)" << '\n';
-				break;
-			case rapidjson::kFalseType: // fallthru
-			case rapidjson::kTrueType:
-				std::cout << std::string(levelMultiplier_*level, ' ')
-					<< std::boolalpha << p->value.GetBool() << '\n';
-				break;
-			case rapidjson::kObjectType:
-				parseObject(doc, p->value.GetObject(), level + 1);
-				break;
-			case rapidjson::kArrayType: 
-				parseArray(doc, p->value.GetArray(), level + 1);
-				break;
-			case rapidjson::kStringType:
-				std::cout << std::string(levelMultiplier_*level, ' ')
-					<< p->value.GetString() << '\n';
-				break;
-			case rapidjson::kNumberType:
-				if (p->value.IsInt()) {
-					std::cout << std::string(levelMultiplier_*level, ' ')
-						<< p->value.GetInt() << '\n';
-				}
-				else if (p->value.IsDouble()) {
-					std::cout << std::string(levelMultiplier_*level, ' ')
-						<< p->value.GetDouble() << '\n';
-				}
-				break;
-			default:
-				std::cout << std::string(levelMultiplier_*level, ' ')
-					<< "unhandled type: " << json.GetType() << '\n';
-			}
-		}
+		std::cout << std::string(levelMultiplier_*level, ' ')
+			<< "Type:" << kTypeNames_[json.GetType()] << '\n';
+		parseObject(doc, json.GetObject(), level + 1);
 		return true;
 	}
 
-	std::cout << std::string(levelMultiplier_*level, ' ');
-	std::cout << "(null)" << '\n';
+	std::cout << std::string(levelMultiplier_*level, ' ')
+		<< "(null)" << '\n';
 	return false;
 }
-
-/*
-void Document::parse(Document& doc, const rapidjson::Value& value, size_t level) {
-	std::cout << std::string(levelMultiplier_*level, ' ') << "Type:" << kTypeNames_[value.GetType()] << '\n';
-
-	if (value.IsNull()) {
-		std::cout << std::string(levelMultiplier_*level, ' ');
-		std::cout << "(null)" << '\n';
-	}
-	else if (value.IsBool()) {
-		std::cout << std::string(levelMultiplier_*level, ' ');
-		std::cout << std::boolalpha << value.GetBool() << '\n';
-	}
-	else if (value.IsInt()) {
-		std::cout << std::string(levelMultiplier_*level, ' ');
-		std::cout << value.GetInt() << '\n';
-	}
-	else if (value.IsDouble()) {
-		std::cout << std::string(levelMultiplier_*level, ' ');
-		std::cout << value.GetDouble() << '\n';
-	}
-	else if (value.IsString()) {
-		std::cout << std::string(levelMultiplier_*level, ' ');
-		std::cout << value.GetString() << '\n';
-	}
-	else if (value.IsArray()) {
-		parseArray(doc, value.GetArray(), level + 1);
-	}
-	else if (value.IsObject()) {
-		parseObject(doc, value.GetObject(), level + 1);
-	}
-}
- */
 
 void Document::parseNull(Document& doc, const rapidjson::Value& value, size_t level) {
 }
@@ -157,43 +85,6 @@ void Document::parseObject(Document& doc, const rapidjson::Value::ConstObject& v
 		}
 	}
 }
-
-/*
-void Document::parseArray(Document& doc, const rapidjson::Document& json, size_t level) {
-	for (rapidjson::Value::ConstValueIterator p = json.Begin(); p != json.End(); ++p) {
-		if (p->IsNull()) {
-			std::cout << std::string(levelMultiplier_*level, ' ');
-			std::cout << "(null)" << '\n';
-		}
-		else if (p->IsBool()) {
-			std::cout << std::string(levelMultiplier_*level, ' ');
-			std::cout << std::boolalpha << p->GetBool() << '\n';
-		}
-		else if (p->IsInt()) {
-			std::cout << std::string(levelMultiplier_*level, ' ');
-			std::cout << p->GetInt() << '\n';
-		}
-		else if (p->IsDouble()) {
-			std::cout << std::string(levelMultiplier_*level, ' ');
-			std::cout << p->GetDouble() << '\n';
-		}
-		else if (p->IsString()) {
-			std::cout << std::string(levelMultiplier_*level, ' ');
-			std::cout << p->GetString() << '\n';
-		}
-		else if (p->IsArray()) {
-			parseArray(doc, p->GetArray(), level + 1);
-		}
-		else if (p->IsObject()) {
-			parseObject(doc, p->GetObject(), level + 1);
-		}
-		else {
-			std::cout << std::string(levelMultiplier_*level, ' ');
-			std::cout << "unhandled" << '\n';
-		}
-	}
-}
- */
 
 void Document::parseArray(Document& doc, const rapidjson::Value::ConstArray& value, size_t level) {
 	for (rapidjson::Value::ConstValueIterator p = value.Begin(); p != value.End(); ++p) {
