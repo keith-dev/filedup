@@ -17,9 +17,10 @@
   #endif
 #endif
 
-#include "filestamps.hpp"
 #include "options.hpp"
-#include "md5.hpp"
+
+#include "filedup/filestamps.hpp"
+#include "filedup/md5.hpp"
 
 #include <unistd.h>
 #include <sys/types.h>

@@ -15,9 +15,10 @@ SHLIB_MAJOR = 0.0
 SHNAME = lib$(SHLIB).so
 SHLIBNAME = $(SHNAME).$(SHLIB_MAJOR)
 
-SRCS = filename.cc filestamps.cc md5.cc options.cc scan.cc
+SRCS = filename.cc filestamps.cc md5.cc
 
 CXXFLAGS += -g -fpic -std=c++17 -pedantic -Wall -Wextra
+
 all: $(SHLIBNAME)
 
 clean:

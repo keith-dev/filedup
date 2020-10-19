@@ -11,8 +11,9 @@
  */
 
 #include "filestamps.hpp"
-#include "options.hpp"
 #include "md5.hpp"
+
+#include <sstream>
 
 //---------------------------------------------------------------------------
 

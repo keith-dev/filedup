@@ -10,23 +10,23 @@
 #	by Webbusy Ltd.
 # ---------------------------------------------------------------------------
 
-PROG_CXX = filedup
-SRCS     = main.cc options.cc scan.cc
+PROG_CXX = load
+SRCS     = main.cc document.cc
 INCS     = 
-MAN      = filedup.1
+MAN      = 
 
 PRRFIX   ?= $(HOME)
 CXXFLAGS += -g -std=c++17 -pedantic -Wall -Wextra -Wno-unused-parameter
-CXXFLAGS += -I..
+CXXFLAGS += -I.. -I$(HOME)/include
 LDADD    += -L.. -lfiledup -L$(PRRFIX)/lib -lcrypto
 
 DEPENDS  = $(PROG_CXX).depends
 MANPAGE  = $(MAN).gz
 
-all: $(PROG_CXX) $(MANPAGE)
+all: $(PROG_CXX)
 
 clean:
-	- rm $(PROG_CXX) $(MANPAGE) $(DEPENDS) $(SRCS:.cc=.o) $(SRCS:.cc=.depend)
+	- rm $(PROG_CXX) $(DEPENDS) $(SRCS:.cc=.o) $(SRCS:.cc=.depend)
 
 $(PROG_CXX): $(SRCS:.cc=.o)
 	$(LINK.cc) -o $@ $^ $(LDADD)
