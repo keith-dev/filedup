@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------
 
 PROG_CXX = load
-SRCS     = main.cc document.cc
+SRCS     = main.cc object.cc document.cc
 INCS     = 
 MAN      = 
 
