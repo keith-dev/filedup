@@ -10,6 +10,6 @@
 #	by Webbusy Ltd.
 # ---------------------------------------------------------------------------
 
-SUBDIR = libfiledup filedup
+SUBDIR = filedup src load
 
 .include <bsd.subdir.mk>

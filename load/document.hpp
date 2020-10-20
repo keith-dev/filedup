@@ -6,12 +6,8 @@
 
 #include <array>
 #include <memory>
-#include <string>
 
 class Document {
-	std::string filename_;
-	rapidjson::Document json_;
-	std::unique_ptr<char[]> buf_;
 	std::unique_ptr<mydoc::Object> object_;
 
 	static constexpr size_t levelMultiplier_{2};

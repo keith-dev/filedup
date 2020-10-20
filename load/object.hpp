@@ -23,6 +23,9 @@ class Object {
         Value(double real) : real(real) {}
         Value(int integer) : integer(integer) {}
 
+        Value(const Value &) = delete;
+        Value& operator=(const Value &) = delete;
+
         Objects* objects;
         Array* array;
         bool boolean;
@@ -35,12 +38,12 @@ class Object {
     Value value;
 
 protected:
-    Object(Objects* objects) : type(Type::Object), value(objects) {}
-    Object(Array* array) : type(Type::Array), value(array) {}
-    Object(bool boolean) : type(Type::Boolean), value(boolean) {}
-    Object(std::string str) : type(Type::String), value(std::move(str)) {}
-    Object(double real) : type(Type::Real), value(real) {}
-    Object(int integer) : type(Type::Integer), value(integer) {}
+    Object(Objects* objects): type(Type::Object),   value(objects) {}
+    Object(Array* array)    : type(Type::Array),    value(array) {}
+    Object(bool boolean)    : type(Type::Boolean),  value(boolean) {}
+    Object(std::string str) : type(Type::String),   value(std::move(str)) {}
+    Object(double real)     : type(Type::Real),     value(real) {}
+    Object(int integer)     : type(Type::Integer),  value(integer) {}
 
 public:
     Object() : type(Type::None), value(0) {}
@@ -66,6 +69,7 @@ public:
         case Type::Real:    return "Real";
         case Type::Integer: return "Integer";
         }
+        return "Unknown";
     }
 
     Objects& object() {

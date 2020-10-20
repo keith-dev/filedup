@@ -10,7 +10,7 @@
 #	by Webbusy Ltd.
 # ---------------------------------------------------------------------------
 
-SUBDIR = filedup src
+SUBDIR = filedup src load
 
 .PHONY: $(SUBDIR)
 
