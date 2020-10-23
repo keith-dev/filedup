@@ -17,6 +17,7 @@ MAN      =
 
 CXXFLAGS += -g -std=c++17 -pedantic -Wall -Wextra -Wno-unused-parameter
 CXXFLAGS += -I.. -I$(HOME)/include
-LDADD    += -L.. -lfiledup -L$(PRRFIX)/lib
+LDADD    += -L$(PRRFIX)/lib -lfiledup
+LDFLAGS  += -L$(PREFIX)/lib -lfiledup
 
 .include <bsd.prog.mk>

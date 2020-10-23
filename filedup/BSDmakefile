@@ -1,0 +1,37 @@
+SHLIB     = filedup
+VER_MAJOR = 0
+VER_MINOR = 0
+
+SRCS      = filename.cc  filestamps.cc  md5.cc
+INCS      = filename.hpp filestamps.hpp md5.hpp fileinfo.hpp
+MAN       =
+NO_OBJ    = noobj
+
+DEBUGFLAGS  = -g
+
+#----------------------------------------------------------------------------
+
+.if defined(DEBUGFLAGS)
+CXXFLAGS    = $(DEBUGFLAGS)
+.endif
+
+# ZMQ_PREFIX ?= /usr/local
+# CXXFLAGS   += -I$(ZMQ_PREFIX)/include
+# LDADD      += -L$(ZMQ_PREFIX)/lib -lzmq
+
+#----------------------------------------------------------------------------
+
+#SHLIB_MAJOR = $(VER_MAJOR).$(VER_MINOR)
+#SONAME = lib$(SHLIB).so.$(VER_MAJOR)
+SHLIB_MAJOR = $(VER_MAJOR)
+SONAME = lib$(SHLIB).so
+
+CXXFLAGS  = -O3 -g -std=c++17 -fpic -Wall -Wextra -Wno-unused-const-variable -Wno-unused-parameter -DUSE_FTS_CMP_CONST_PTR
+
+PREFIX     ?= /usr/local
+INCLUDEDIR  = $(PREFIX)/include
+LIBDIR      = $(PREFIX)/lib
+SHAREDIR    = $(PREFIX)/share
+
+.include <bsd.lib.mk>
+.include <bsd.incs.mk>
