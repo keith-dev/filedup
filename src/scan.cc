@@ -70,6 +70,9 @@ try {
 					std::move(name));
 				scan_file(file_stamps, opts, std::move(rec));
 			}
+			else {
+				if (opts.verbose > DBG_LEVEL) dbg << "threshold: " + name << "\n";
+			}
 			return;
 		}
 
@@ -94,18 +97,13 @@ try {
 			if (S_ISDIR(ftschild->fts_statp->st_mode)) {
 				scan(file_stamps, opts, std::move(name));
 			}
-			else {
-				if (S_ISREG(ftschild->fts_statp->st_mode)) {
-					file_info_t rec = make_fileinfo(
-						ftschild->fts_statp->st_ino,
-						ftschild->fts_statp->st_nlink,
-						ftschild->fts_statp->st_size,
-						std::move(name));
-					scan_file(file_stamps, opts, std::move(rec));
-				}
-				else {
-					if (opts.verbose > DBG_LEVEL) dbg << "threshold: " + name << "\n";
-				}
+			else if (S_ISREG(ftschild->fts_statp->st_mode)) {
+				file_info_t rec = make_fileinfo(
+					ftschild->fts_statp->st_ino,
+					ftschild->fts_statp->st_nlink,
+					ftschild->fts_statp->st_size,
+					std::move(name));
+				scan_file(file_stamps, opts, std::move(rec));
 			}
 		}
 		break;
